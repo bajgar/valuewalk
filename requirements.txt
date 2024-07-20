@@ -1,0 +1,17 @@
+numpy
+torch
+scipy
+pandas
+jupyter
+botorch
+gpytorch
+plotly
+matplotlib
+gymnasium[box2d]
+pydantic
+platformdirs
+pyparsing
+pyro-ppl
+pynput
+pytest
+swig

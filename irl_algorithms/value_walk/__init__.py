@@ -1,0 +1,3 @@
+# from irl_algorithms.value_walk.value_walk_tabular import ValueWalkTabular
+# from irl_algorithms.value_walk.value_walk_approx_discrete import ValueWalkApproxDiscrete
+from irl_algorithms.value_walk.value_walk_cts import ValueWalkCts
