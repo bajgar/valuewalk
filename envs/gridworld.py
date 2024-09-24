@@ -1,6 +1,6 @@
 import re
 import enum
-from typing import Callable
+from typing import Callable, Tuple
 
 import random
 import numpy as np
@@ -322,7 +322,7 @@ class GridWorld(FiniteMDP):
 
         return p, r, s0, terminals
 
-    def get_norm_coords(self, state: int):
+    def get_norm_coords(self, state: int) -> np.ndarray:
         """
         Get normalized coordinates corresponding to state
         Args:
@@ -368,7 +368,7 @@ class GridWorld(FiniteMDP):
         else:
             raise NotImplementedError(f"Observation mode '{observation_mode}' not implemented")
 
-    def pos2idx(self, *args):
+    def pos2idx(self, *args) -> int:
         """
         Converts a 2d position to a 1d index
         input: 2d position represented as a pair of integers
@@ -381,7 +381,7 @@ class GridWorld(FiniteMDP):
 
         return pos[0] * self._n_cols + pos[1]
 
-    def idx2pos(self, idx: int):
+    def idx2pos(self, idx: int) -> Tuple[int, int]:
         """
         Converts a 1D state index to a 2D position
         input:
@@ -398,7 +398,7 @@ class GridWorld(FiniteMDP):
 
         return pos
 
-    def action_target_idx(self, state, action):
+    def action_target_idx(self, state, action) -> int:
         """
         Returns
         :param state: (int) current state index
@@ -412,7 +412,7 @@ class GridWorld(FiniteMDP):
         else:
             return state
 
-    def is_valid_position(self, x, y):
+    def is_valid_position(self, x, y) -> bool:
         return 0 <= x < self._n_rows and 0 <= y < self._n_cols
 
     def visualize_rewards(self, r=None, title: str = "Ground-truth rewards", **kwargs):
@@ -470,7 +470,7 @@ class GridWorld(FiniteMDP):
         self.visualize_state()
 
     @property
-    def shape(self):
+    def shape(self) -> Tuple[int, int]:
         return self._n_rows, self._n_cols
 
     def reset(self, *, seed=None, options=None):
@@ -507,11 +507,11 @@ class GridWorld(FiniteMDP):
         img_utils.heatmap2d(grid, title, **kwargs)
 
     @property
-    def height(self):
+    def height(self) -> int:
         return self._n_rows
 
     @property
-    def width(self):
+    def width(self) -> int:
         return self._n_cols
 
 
@@ -525,8 +525,6 @@ def create_obstacle_gridworld(env_config: ObstacleGridworldConfig) -> Callable[[
         gw_grid = [[-env_config.time_penalty] * env_config.width for h in range(env_config.height)]
 
         gw_grid[0][0] = f'{-env_config.time_penalty}I'
-        if env_config.extra_initial_state:
-            gw_grid[env_config.height-2][env_config.width - 1] = f'{-env_config.time_penalty}I'
 
         gw_grid[0][env_config.width - 1] = f'{env_config.goal_reward}T'
 
