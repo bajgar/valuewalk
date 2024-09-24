@@ -5,6 +5,7 @@ from typing import Callable, Tuple
 import random
 import numpy as np
 import gymnasium as gym
+import torch.distributions
 
 from configuration.configurable_factory import configurable_factory
 from experiments.experiment_config import ExperimentConfig
@@ -47,6 +48,7 @@ class ObstacleGridworldConfig(EnvConfig):
     goal_reward: float = 10.
     obstacle_reward: float = -30.
     epsilon: float = 0.1    # Probability of random movement at each step
+    reward_distribution_factory: Callable[[], torch.distributions.Distribution] = None
 
     reward_type: RewardType = RewardType.s_source
     observation_type: ObservationType = ObservationType.onehot
@@ -543,14 +545,37 @@ def create_obstacle_gridworld(env_config: ObstacleGridworldConfig) -> Callable[[
     return env_factory
 
 
-class MuddyGridWorld(GridWorld):
-    # Subclass of GridWorld that stores the grid_labels - [1,0,0]=normal, [0,1,0]=muddy, [0,0,1]=reward
-    def __init__(self, grid, grid_labels = None, epsilon: float = 0, s0_grid=None, observations=ObservationType.index, reward_type=RewardType.s_target, kernel_grid_size=(3, 3), delayed_terminal=True, **kwargs):
-        super().__init__(grid, epsilon, s0_grid, observations, reward_type, kernel_grid_size, delayed_terminal, **kwargs)
+@configurable_factory
+def create_random_gridworld(env_config: EnvConfig) -> Callable[[], GridWorld]:
+    assert env_config.num_actions == 5
+    reward_dist = env_config.reward_distribution_factory()
 
-        self.grid_labels = [item for sublist in grid_labels for item in sublist]
-        self.grid_labels.append([1.,0.,0.]) #final state
-        self.grid_labels = [np.argmax(i) for i in self.grid_labels]
+    def env_factory():
+
+        if env_config.seed is not None:
+            torch.manual_seed(env_config.seed)
+            np.random.seed(env_config.seed)
+            random.seed(env_config.seed)
+
+        gw_grid = reward_dist.sample().reshape((env_config.height, env_config.width)).numpy()
+
+        # Convert to string
+        gw_grid_str = gw_grid.astype(str)
+
+        for h in range(env_config.height):
+            for w in range(env_config.width):
+                if random.random() < 0.1 or gw_grid[h][w] > np.quantile(gw_grid, 0.9):
+                    gw_grid_str[h][w] = str(gw_grid_str[h][w]) + "T"
+
+        env = GridWorld(gw_grid_str, observations=env_config.observation_type, reward_type=env_config.reward_type,
+                        direct_access=env_config.direct_access, epsilon=env_config.epsilon,
+                        max_steps=env_config.max_steps)
+
+        print(gw_grid_str)
+
+        return env
+
+    return env_factory
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 import pydantic
-from typing import Callable
+from typing import Callable, Optional
 import gymnasium as gym
 
 
@@ -13,3 +13,5 @@ class EnvConfig(pydantic.BaseModel):
     a_dim: int = None
 
     env_name: str = None
+
+    seed: Optional[int] = None
