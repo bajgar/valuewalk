@@ -291,12 +291,12 @@ class GridWorld(FiniteMDP):
                 if isinstance(cell, float) or isinstance(cell, int):
                     r[idx] = cell
                 elif isinstance(cell, str):
-                    if re.match('^[\d.]+$', cell):
+                    if re.match('^-?[\d.]+$', cell):
                         r[idx] = float(cell)
                     else:
-                        m = re.match('^([-\d.]+)([TI])$', cell)
+                        m = re.match('^(-?[\d.]+)([TI])$', cell)
                         if m:
-                            r[i * self._n_cols + j] = float(m.group(1))
+                            r[idx] = float(m.group(1))
                             if m.group(2) == "T":
                                 terminal = True
                                 if not self.delayed_terminal:
