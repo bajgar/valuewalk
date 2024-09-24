@@ -317,6 +317,9 @@ class GridWorld(FiniteMDP):
                     s0[idx] = s0_grid[i, j]
         p[-1, :, -1] = 1
 
+        if s0_grid is None and np.sum(s0) == 0:
+            s0 = np.ones((n_states,), dtype=np.float_)
+
         # Normalize the initial state distribution
         s0 = np.array(s0) / np.sum(s0)
 
