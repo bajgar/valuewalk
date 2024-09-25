@@ -32,7 +32,6 @@ class BayesianIRLConfig(IRLConfig):
     hmc_use_nuts: bool = True
     pyro_jit_compile: bool = True
 
-    svi_iters: int = 1000
     svi_lr: float = 0.01
     svi_reporting_frequency: int = 1000
 

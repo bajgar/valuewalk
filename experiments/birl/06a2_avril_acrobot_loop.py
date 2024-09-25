@@ -54,7 +54,7 @@ def get_exp_config():
         prior_kernel_factory=get_rbf_kernel_factory(input_dims=env_config.obs_dim + env_config.a_dim),
         reward_prior_factory=get_gp_prior,
 
-        svi_iters=50000,
+        epochs=500,
         svi_lr=1e-4,
         svi_reporting_frequency=500,
 
