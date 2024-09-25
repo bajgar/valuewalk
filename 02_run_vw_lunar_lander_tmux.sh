@@ -28,8 +28,8 @@ for split in "${splits[@]}"; do
         log_file="$log_dir/vw_lunar.hyper.split$split.c$core.$current_time.log.txt"
 
         # Command to run, with logging and a read to keep the window open
-        command="CUDA_VISIBLE_DEVICES='' taskset -c $core python3 experiments/birl/06b_vw_lunar_lander.py --num_trajs $traj_num --split $split --core_id $core; echo 'Run completed. Press enter to close.'; read"
-#        command="CUDA_VISIBLE_DEVICES='' taskset -c $core python3 experiments/birl/06b_vw_lunar_lander.py --split $split --core_id $core; echo 'Run completed. Press enter to close.'; read"
+        command="CUDA_VISIBLE_DEVICES='' taskset -c $core python3 experiments/birl/06b3_vw_lunar_lander.py --num_trajs $traj_num --split $split --core_id $core; echo 'Run completed. Press enter to close.'; read"
+#        command="CUDA_VISIBLE_DEVICES='' taskset -c $core python3 experiments/birl/06b3_vw_lunar_lander.py --split $split --core_id $core; echo 'Run completed. Press enter to close.'; read"
 
        # Run ID for the window name
         run_id="traj$traj_num.split$split.rep$rep"
