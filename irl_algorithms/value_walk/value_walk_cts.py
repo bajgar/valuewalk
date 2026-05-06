@@ -84,7 +84,7 @@ class QParamPriorCts(dist.Distribution):
 
         self.x_eval_bf, self.x_eval_next_baf = self.prepare_eval_tensors()
 
-        logging.info("QParamPriorCts initialized with the following (discretized) candidate actions: ", self.candidate_actions)
+        logging.info("QParamPriorCts initialized with the following (discretized) candidate actions: %s", self.candidate_actions)
 
     def prepare_eval_tensors(self):
         """
