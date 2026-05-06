@@ -28,7 +28,7 @@ class DemosConfig(pydantic.BaseModel):
     index_to_onehot: bool = False
     append_last_dummy: bool = False
 
-    data_split: str = "train"
+    data_split: str = "train0"
 
 
     @pydantic.validator("total_samples")
