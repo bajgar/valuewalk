@@ -7,18 +7,24 @@ from experiments.paths import DATASET_DIR
 from irl_algorithms.demonstrations import Demonstrations, Trajectory
 
 
+AVRIL_DATASET_ENV_ALIASES = {
+    "LunarLander-v3": "LunarLander-v2",
+}
+
+
 def load_avril_demo_data(env_name: str, num_trajs: int = None,
                          randomize_demo_order: bool = False, split: str = "train0"):
     """
     Loads the raw trajectory data for the given environment as provided with the AVRIL implementation.
     """
+    dataset_env_name = AVRIL_DATASET_ENV_ALIASES.get(env_name, env_name)
 
     if split == "all":
-        path = DATASET_DIR/f"sbirl/volume/{env_name}/expert_trajs.npy"
+        path = DATASET_DIR/f"sbirl/volume/{dataset_env_name}/expert_trajs.npy"
         data = np.load(path, allow_pickle=True)
         data_trajs = data.reshape(1)[0]["trajs"]
     elif split.startswith("train") or split.startswith("test"):
-        path = DATASET_DIR/f"sbirl/volume/{env_name}/expert_trajs_{split}.pkl"
+        path = DATASET_DIR/f"sbirl/volume/{dataset_env_name}/expert_trajs_{split}.pkl"
         with open(path, "rb") as f:
             data_trajs = pkl.load(f)
     else:
@@ -95,6 +101,7 @@ def load_avril_demonstrations(env_name: str, num_trajs: int = None, randomize_de
         "CartPole-v1": 2,
         "Acrobot-v1": 3,
         "LunarLander-v2": 4,
+        "LunarLander-v3": 4,
     }
     num_actions = env_to_num_actions[env_name]
 
@@ -103,6 +110,7 @@ def load_avril_demonstrations(env_name: str, num_trajs: int = None, randomize_de
         "CartPole-v1": (True, False),
         "Acrobot-v1": (False, True),
         "LunarLander-v2": (False, True),
+        "LunarLander-v3": (False, True),
     }
     default_episode_end = env_to_episode_end[env_name]
 

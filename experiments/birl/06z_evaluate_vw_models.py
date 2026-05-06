@@ -8,7 +8,7 @@ from experiments.paths import RESULTS_DIR
 from experiments.utils.evaluation import test_vw_apprentice_on_gym_env
 
 
-ENV_NAME = "LunarLander-v2"
+ENV_NAME = "LunarLander-v3"
 RESULTS_GLOB = "birl/06b_vw_lunar_lander*_hypersearch_*.pt"
 DEFAULT_HIDDENS = [16]  # Hiddens will be parsed from file name if available
 INPUT_DIM = 12

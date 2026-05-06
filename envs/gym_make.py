@@ -40,7 +40,7 @@ def get_lunar_lander_env_config():
     """
     return EnvConfig(
         env_factory=get_gym_make_factory,
-        env_name="LunarLander-v2",
+        env_name="LunarLander-v3",
         obs_dim=8,
         a_dim=4)
 

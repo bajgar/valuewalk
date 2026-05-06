@@ -7,6 +7,7 @@ from tqdm import tqdm
 env_name_to_num_actions = {
     "CartPole-v1": 2,
     "LunarLander-v2": 4,
+    "LunarLander-v3": 4,
     "Acrobot-v1": 3}
 
 
