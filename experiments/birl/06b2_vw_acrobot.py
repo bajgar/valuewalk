@@ -102,10 +102,6 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
     split = args.split
 
-    exp_config = get_exp_config()
-    experiment = IRLExperiment(exp_config)
-    reward_model, info = experiment.run()
-
     num_repetitions = 4
 
     trajectory_nums = [1, 3, 7, 10, 15]
@@ -118,6 +114,7 @@ if __name__ == "__main__":
             exp_config = get_exp_config()
             exp_config.demos_config.n_trajectories = n
             exp_config.demos_config.data_split = "train" + str(split)
+            print(exp_config.demos_config.data_split)
 
             exp_config.result_save_path = get_result_file_path(extra=f"{n}t_hl{'_'.join([str(size) for size in exp_config.irl_config.q_model_hidden_layer_sizes])}_split{split}_paper")
             experiment = IRLExperiment(exp_config)

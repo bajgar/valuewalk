@@ -97,10 +97,6 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
     split = args.split
 
-    exp_config = get_exp_config()
-    experiment = IRLExperiment(exp_config)
-    reward_model, info = experiment.run()
-
     num_repetitions = 4
 
     trajectory_nums = [1, 3, 7, 10, 15]
