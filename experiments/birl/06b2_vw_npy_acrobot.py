@@ -92,24 +92,17 @@ if __name__ == "__main__":
     # experiment = IRLExperiment(exp_config)
     # reward_model, info = experiment.run()
 
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("--split", type=int, default=0)
-    args = arg_parser.parse_args()
-    split = args.split
-
-    num_repetitions = 4
-
+    splits = [0, 1, 2, 3, 4]
+    num_repetitions = 2
     trajectory_nums = [1, 3, 7, 10, 15]
-    test_rewards = []
 
     for n in trajectory_nums:
-        test_rewards_n = []
-        for i in range(num_repetitions):
-            print(f"Running {n} demos, repetition {i}...")
-            exp_config = get_exp_config()
-            exp_config.demos_config.n_trajectories = n
-            exp_config.demos_config.data_split = "train" + str(split)
-
-            exp_config.result_save_path = get_result_file_path(extra=f"{n}t_hl{'_'.join([str(size) for size in exp_config.irl_config.q_model_hidden_layer_sizes])}_split{split}_paper")
-            experiment = IRLExperiment(exp_config)
-            reward_model, info = experiment.run()
+        for split in splits:
+            for i in range(num_repetitions):
+                print(f"Running {n} demos, repetition {i}...")
+                exp_config = get_exp_config()
+                exp_config.demos_config.n_trajectories = n
+                exp_config.demos_config.data_split = "train" + str(split)
+                exp_config.result_save_path = get_result_file_path(extra=f"{n}_split{split}_numpyro")
+                experiment = IRLExperiment(exp_config)
+                reward_model, info = experiment.run()
