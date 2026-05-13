@@ -333,7 +333,7 @@ def collect_samples(step_fn, state, rng_key, num_samples: int):
         length=num_samples,
     )
     
-    samples = [s.position for s in states]
+    samples = states.position
     
     return samples, infos, last_state
 
