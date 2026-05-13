@@ -47,7 +47,7 @@ def load_vw_model(model_file: str | Path) -> QBasedSampleBasedRewardModel:
         if len(samples['theta_q'].shape) == 1:
             model.q_param_samples['theta_q'] = model.q_param_samples['theta_q'].unsqueeze(0)
     else:
-        model = torch.load(model_file, map_location=torch.device('cpu'))
+        model = torch.load(model_file, map_location=torch.device('cpu'), weights_only=False)
 
     return model
 

@@ -2,4 +2,4 @@
 # from irl_algorithms.value_walk.value_walk_approx_discrete import ValueWalkApproxDiscrete
 from irl_algorithms.value_walk.value_walk_cts import ValueWalkCts
 from irl_algorithms.value_walk.value_walk_cts_numpyro import ValueWalkCtsNumpyro as VWCN
-from irl_algorithms.value_walk.value_walk_cts_numpyro_blacjax import ValueWalkCtsNumpyro as VWCNBJ
+from irl_algorithms.value_walk.value_walk_cts_numpyro_blackjax import ValueWalkCtsNumpyro as VWCNBJ
