@@ -308,6 +308,11 @@ class ValueWalkCtsNumpyro(IRLMethod):
 
         info = {}
 
+        
+        print(samples['theta_q'].shape, type(samples['theta_q']))
+        samples['theta_q'] = _jax_to_torch(samples['theta_q'])
+        print(samples['theta_q'].shape, type(samples['theta_q']))
+
         return QBasedSampleBasedRewardModel(q_param_samples=samples,
                                             q_model=self.config.q_model,
                                             preprocessing_module=preprocessing_module), info
@@ -327,7 +332,10 @@ def collect_samples(step_fn, state, rng_key, num_samples: int):
         xs=None,
         length=num_samples,
     )
-    return states, infos, last_state
+    
+    samples = [s.position for s in states]
+    
+    return samples, infos, last_state
 
 
 class BlackJAXMCMC:
