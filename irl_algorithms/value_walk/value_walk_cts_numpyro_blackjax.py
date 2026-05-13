@@ -307,11 +307,8 @@ class ValueWalkCtsNumpyro(IRLMethod):
                                 preprocessing_module=preprocessing_module)
 
         info = {}
-
         
-        print(samples['theta_q'].shape, type(samples['theta_q']))
-        samples['theta_q'] = _jax_to_torch(samples['theta_q'])
-        print(samples['theta_q'].shape, type(samples['theta_q']))
+        samples[VW_Q_PARAM_KEY] = _jax_to_torch(samples[VW_Q_PARAM_KEY]) # Potential gains if this is made native
 
         return QBasedSampleBasedRewardModel(q_param_samples=samples,
                                             q_model=self.config.q_model,
@@ -373,6 +370,8 @@ class BlackJAXMCMC:
         # Sampling: build a fresh kernel from the adapted parameters
         nuts = blackjax.nuts(self.logdensity_fn, **parameters) if self.nuts else blackjax.hmc(self.logdensity_fn, **parameters)
         step_fn = jax.jit(nuts.step)
+
+        print("Collecting samples...")
 
         samples, infos, last_state = collect_samples(
             step_fn=step_fn,

@@ -319,9 +319,7 @@ class ValueWalkCtsNumpyro(IRLMethod):
 
         info = {}
 
-        print(samples['theta_q'].shape, type(samples['theta_q']))
-        samples['theta_q'] = _jax_to_torch(samples['theta_q'])
-        print(samples['theta_q'].shape, type(samples['theta_q']))
+        samples[VW_Q_PARAM_KEY] = _jax_to_torch(samples[VW_Q_PARAM_KEY])
 
         return QBasedSampleBasedRewardModel(q_param_samples=samples,
                                             q_model=self.config.q_model,
