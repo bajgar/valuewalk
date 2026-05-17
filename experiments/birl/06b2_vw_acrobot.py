@@ -98,13 +98,13 @@ if __name__ == "__main__":
     # reward_model, info = experiment.run()
 
     splits = [0, 1, 2, 3, 4]
-    num_repetitions = 2
+    num_repetitions = 1
     trajectory_nums = [1, 3, 7, 10, 15]
 
     for n in trajectory_nums:
         for split in splits:
             for i in range(num_repetitions):
-                print(f"Running {n} demos, repetition {i}...")
+                print(f"Running {n} demos, split {split}, repetition {i}")
                 exp_config = get_exp_config()
                 exp_config.demos_config.n_trajectories = n
                 exp_config.demos_config.data_split = "train" + str(split)

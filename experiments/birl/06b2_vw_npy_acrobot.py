@@ -15,6 +15,8 @@ from gpjax.mean_functions import Zero
 from gpjax.kernels import RBF
 import jax.numpy as jnp
 
+SMOKE_TEST = False
+BLACKJAX = True
 
 def zero_mean_factory():
     return Zero()
@@ -45,9 +47,6 @@ def get_exp_config():
         demo_subset_randomization=False,
         index_to_onehot=True
     )
-
-    SMOKE_TEST = False
-    BLACKJAX = True
 
     irl_config = BayesianIRLConfig(
         irl_method_factory=VWCN if not BLACKJAX else VWCNBJ,
@@ -93,16 +92,17 @@ if __name__ == "__main__":
     # reward_model, info = experiment.run()
 
     splits = [0, 1, 2, 3, 4]
-    num_repetitions = 2
+    num_repetitions = 1
     trajectory_nums = [1, 3, 7, 10, 15]
 
     for n in trajectory_nums:
         for split in splits:
             for i in range(num_repetitions):
-                print(f"Running {n} demos, repetition {i}...")
+                print(f"Running {n} demos, split {split}, repetition {i}")
                 exp_config = get_exp_config()
+                print(f"Running Blackjax as sampler? {BLACKJAX}")
                 exp_config.demos_config.n_trajectories = n
                 exp_config.demos_config.data_split = "train" + str(split)
-                exp_config.result_save_path = get_result_file_path(extra=f"{n}_split{split}_numpyro")
+                exp_config.result_save_path = get_result_file_path(extra=f"{n}_split{split}_numpyro_{'blackjax' if BLACKJAX==True else '_'}")
                 experiment = IRLExperiment(exp_config)
                 reward_model, info = experiment.run()
