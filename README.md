@@ -1,4 +1,4 @@
-> ** WARNING: This code is still experimental, and some features or functionalities may be changed or unavailable. Please proceed with caution when using this code to run your experiments. If you need to run ValueWalk for a simple environment and do not care about inference time, prefer using the algorithms in the main branch of this repository.**
+> **WARNING: This code is still experimental, and some features or functionalities may be changed or unavailable. Please proceed with caution when using this code to run your experiments. If you need to run ValueWalk for a simple environment and do not care about inference time, prefer using the algorithms in the main branch of this repository.**
 
 This repository branch contains the JAX-based implementation of the ValueWalk algorithm, originally presented in "Walking the Values in Bayesian Inverse Reinforcement Learning" by Ondrej Bajgar et al. (UAI 2024).
 The article is available here: https://arxiv.org/abs/2407.10971
