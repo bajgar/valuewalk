@@ -33,4 +33,4 @@ Once you've ran the experiment loops, simply run all cells in `experiments/birl/
 
 ## Contributing
 
-If you wish to contribute to this repository, simply create a fork, implement changes, and open a PR. Feel free to also get in touch with either Ondrej (ondrej@bajgar.com) or Peter (peter.tisnikar@eng.ox.ac.uk). Help is appreciated, especially if you have ideas on how to further speed up the algorithms, or make them more computationally efficient.
+If you wish to contribute to this repository, simply create a fork, implement changes, and open a PR. Feel free to also get in touch with either Ondrej or Peter. Help is appreciated, especially if you have ideas on how to further speed up the algorithms, or make them more computationally efficient.
