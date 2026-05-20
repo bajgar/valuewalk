@@ -1,49 +1,84 @@
-from typing import List, Tuple, Callable, Dict, Optional, Union
+"""
+This script aims to re-implement the ValueWalk algorithm using Numpyro.
+The code is experimental and not yet extensively tested for correctness of inference.
+    
+"""
+
+from __future__ import annotations
+from typing import List, Callable, Optional, Tuple
 import logging
 
-import gymnasium as gym
 import numpy as np
-import pyro
-import pyro.distributions as dist
+import gymnasium as gym
+import numpyro
+import numpyro.distributions as dist
+import jax
+import jax.numpy as jnp
+from jax.random import PRNGKey
+from numpyro.infer import NUTS, HMC
 import torch
 from torch.quasirandom import SobolEngine
-
-from irl_algorithms.demonstrations import Demonstrations, Trajectory
+from irl_algorithms.demonstrations import Demonstrations
 from irl_algorithms.irl_method import IRLMethod
-from irl_algorithms.mcmc_irl import BayesianIRLConfig, get_pyro_mcmc_kernel
-from models import linear_model
-from models.reward_models.linear_reward_model import MonteCarloLinearRewardModel
+from models import lm_jax
 from models.reward_models.q_based_reward_model import QBasedSampleBasedRewardModel
-from rl_algorithms.policies.boltzmann import ContinuousBoltzmannPolicy
-
-
-if torch.cuda.is_available():
-    default_device = torch.device('cuda')
-    torch.set_default_tensor_type(torch.cuda.FloatTensor)
-else:
-    default_device = torch.device('cpu')
+from irl_algorithms.mcmc_irl import BayesianIRLConfig
 
 VW_Q_PARAM_KEY = 'theta_q'
 
+if torch.cuda.is_available():
+    TORCH_DEVICE = torch.device('cuda')
+    idx = TORCH_DEVICE.index
+    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    JAX_DEVICE = jax.devices('gpu')[idx]
+else:
+    TORCH_DEVICE = torch.device('cpu')
+    JAX_DEVICE = jax.devices('cpu')[0]
 
-class QParamPriorCts(dist.Distribution):
+
+def _rng_key() -> jnp.ndarray:
+    return jax.device_put(
+        PRNGKey(int(0)),
+        device=JAX_DEVICE,
+    )
+
+# JAX-Torch conversion helpers
+def _torch_to_jax(tensor: torch.Tensor, device=JAX_DEVICE, dtype: Any=jnp.float32) -> jnp.ndarray:
+        return jax.device_put(jnp.array(tensor.detach().cpu().numpy(), dtype=dtype), device=device)
+
+def _jax_to_torch(array: jnp.ndarray, device=TORCH_DEVICE):
+        return torch.from_numpy(np.array(array)).to(device)
+
+def value_walk_model_approx_cts_numpyro(x_daf: jnp.ndarray, theta_q_prior: jnp.ndarray, beta_expert: jnp.ndarray, a_df: jnp.ndarray | None=None,
+                                bayesian_module=lm_jax):
+
+    theta_q = numpyro.sample(VW_Q_PARAM_KEY, theta_q_prior)
+
+    q_da = bayesian_module(x_daf, theta_q).squeeze(axis=-1)
+
+    likelihood_dist = dist.Categorical(logits=beta_expert*q_da)
+
+    with numpyro.plate('data', x_daf.shape[0]):
+        return numpyro.sample('obs', likelihood_dist, obs=jnp.argmax(a_df, axis=1) if a_df is not None else None)
+
+class QParamPriorCtsNumpyro(dist.Distribution):
     """
     Prior distribution over Q-values implied by the prior over rewards as used by the continuous version
-    of the ValueWalk algorithm.
+    of the ValueWalk algorithm. This largely mirrors the torch implementation, but replaces the internal
+    distribution and callable objects with JAX/Numpyro objects, focussing on the sample() and log_prob() functions.
     """
 
     support = dist.constraints.real_vector
 
     def __init__(self,
-                 r_prior: torch.distributions.Distribution,
+                 r_prior,
                  action_set_af: torch.Tensor,
                  preprocessing_module: torch.nn.Module,
-                 bayesian_module: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+                 bayesian_module: Callable,
                  env_sim: gym.Env,
                  num_params: int,
                  evaluation_trajectories: Demonstrations = None,
                  approximate_sampling_dist: dist.Distribution = None,
-                 device=default_device,
                  use_cheating_sample: bool = True,
                  gamma: float = 0.9,
                  final_q_to_r: bool = False):
@@ -60,6 +95,7 @@ class QParamPriorCts(dist.Distribution):
         :param gamma: Discount factor
         :param num_action_samples: Number of action samples used to compute the q_values
         """
+        super().__init__(batch_shape=(), event_shape=(num_params,))
 
         self.r_prior_c = r_prior
         self.candidate_actions = action_set_af
@@ -71,35 +107,35 @@ class QParamPriorCts(dist.Distribution):
         self.gamma = gamma
         self.final_q_to_r = final_q_to_r
 
-        self.device = device
+        self.key = _rng_key()
 
         self.param_shape = (num_params,)
 
         if approximate_sampling_dist is None:
-            self.approximate_sampling_dist = dist.Normal(torch.zeros(self.param_shape, dtype=torch.float),
-                                                         torch.ones(self.param_shape, dtype=torch.float)).to_event(1)
+            self.approximate_sampling_dist = dist.Normal(jnp.zeros(self.param_shape, dtype=float),
+                                                         jnp.ones(self.param_shape, dtype=float)).to_event(1)
         else:
             self.approximate_sampling_dist = approximate_sampling_dist
         self._use_cheating_sample = use_cheating_sample
 
-        self.x_eval_bf, self.x_eval_next_baf = self.prepare_eval_tensors()
+        self.x_eval_bf, self.x_eval_next_baf = self.prepare_eval_arrays()
 
         logging.info("QParamPriorCts initialized with the following (discretized) candidate actions: %s", self.candidate_actions)
 
-    def prepare_eval_tensors(self):
+    def prepare_eval_arrays(self):
         """
         Prepare tensors for evaluating the q_values of the evaluation trajectories.
         """
         x_list = []
         x_next_list = []
         for traj in self.evaluation_trajectories:
-            traj_oa_tensor = traj.get_oa_tensor().float().to(self.device)
+            traj_oa_tensor = traj.get_oa_tensor().float().to(TORCH_DEVICE)
             # Get the dimensions of the states tensor and the candidate actions tensor
             state_feats = traj.states_tensor.shape[-1]
             action_feats = self.candidate_actions.shape[-1]
 
             # Broadcast the tensors to be ready for concatenation:
-            states_next_baf = traj.states_tensor[1:, None, :].expand(-1, self.candidate_actions.shape[0], state_feats).float().to(self.device)
+            states_next_baf = traj.states_tensor[1:, None, :].expand(-1, self.candidate_actions.shape[0], state_feats).float().to(TORCH_DEVICE)
             actions_baf = self.candidate_actions[None, :, :].expand(states_next_baf.shape[0], -1, action_feats)
 
             x_next_baf = torch.cat([states_next_baf, actions_baf], dim=-1)
@@ -117,13 +153,13 @@ class QParamPriorCts(dist.Distribution):
 
         if hasattr(self.r_prior_c, "precompute"):
             # Precompute the reward prior for the evaluation trajectories (typically precomputes the covariance matrix)
-            self.r_prior_c.precompute(x_eval_bf)
+            self.r_prior_c.precompute(_torch_to_jax(x_eval_bf))
 
         if self.preprocessing_module is not None:
             x_eval_bf = self.preprocessing_module(x_eval_bf)
             x_eval_next_baf = self.preprocessing_module(x_eval_next_baf)
 
-        return x_eval_bf.detach(), x_eval_next_baf.detach().to(self.device).clone(memory_format=torch.contiguous_format)
+        return _torch_to_jax(x_eval_bf), _torch_to_jax(x_eval_next_baf.to(TORCH_DEVICE).clone(memory_format=torch.contiguous_format))
 
     def sample(self):
         """
@@ -132,12 +168,12 @@ class QParamPriorCts(dist.Distribution):
         :return:
         """
         if self._use_cheating_sample:
-            q_params = self.approximate_sampling_dist.sample()
+            q_params = self.approximate_sampling_dist.sample(self.key)
         else:
             raise NotImplementedError
         return q_params
 
-    def log_prob(self, q_params: torch.Tensor) -> torch.Tensor:
+    def log_prob(self, q_params: jnp.ndarray) -> jnp.ndarray:
 
         r_b = self.calculate_implied_rewards(q_params)
 
@@ -147,40 +183,26 @@ class QParamPriorCts(dist.Distribution):
 
         return q_logprior
 
-    def calculate_implied_rewards(self, q_params: torch.Tensor
-                                  ) -> List[torch.Tensor]:
+    def calculate_implied_rewards(self, q_params: jnp.ndarray
+                                  ) -> List[jnp.ndarray]:
         current_q_b = self.bayesian_module(self.x_eval_bf, q_params).squeeze(-1)
         next_q_ba = self.bayesian_module(self.x_eval_next_baf, q_params).squeeze(-1)
 
         if self.final_q_to_r:
             next_q_ba[-1, :] = 0
 
-        next_v_b = next_q_ba.max(dim=-1)[0]
+        next_v_b = jnp.max(next_q_ba, axis=-1)[0]
 
         r_b = current_q_b - self.gamma * next_v_b
 
         return r_b
 
+class ValueWalkCtsNumpyro(IRLMethod):
 
-def value_walk_model_approx_cts(x_daf, theta_q_prior, beta_expert, a_df=None,
-                                bayesian_module=linear_model):
-
-    theta_q = pyro.sample(VW_Q_PARAM_KEY, theta_q_prior)
-
-    q_da = bayesian_module(x_daf, theta_q).squeeze(-1)
-
-    likelihood_dist = dist.Categorical(logits=beta_expert*q_da)
-
-    with pyro.plate('data', x_daf.shape[0]):
-        return pyro.sample('obs', likelihood_dist, obs=torch.argmax(a_df, dim=1) if a_df is not None else None)
-
-
-class ValueWalkCts(IRLMethod):
-
-    def __init__(self, env: gym.Env, config: BayesianIRLConfig, device=default_device):
+    def __init__(self, env: gym.Env, config: BayesianIRLConfig):
         super().__init__(env, config)
         self.reward_prior = config.reward_prior_factory()
-        self.device = device
+        self.config = config # not needed techincally, I am just annoyed at all the red lines downstream
 
         # Prepare a set of alternative actions
         self.action_set_af = self.prepare_actions(config.num_action_samples)
@@ -188,7 +210,7 @@ class ValueWalkCts(IRLMethod):
     def prepare_actions(self, num_points: int = None):
         if isinstance(self.env.action_space, gym.spaces.Discrete):
             assert num_points is None
-            return torch.eye(self.env.action_space.n, device=self.device, dtype=torch.float)
+            return torch.eye(self.env.action_space.n, device=TORCH_DEVICE, dtype=torch.float)
         else:
             return self.initialize_sobol_actions(num_points)
 
@@ -198,12 +220,12 @@ class ValueWalkCts(IRLMethod):
         """
         sobol_engine = SobolEngine(dimension=self.env.action_space.shape[0], scramble=True, seed=7)
         # Generate points in [0, 1] range
-        raw_points = sobol_engine.draw(num_points).to(self.device)
+        raw_points = sobol_engine.draw(num_points).to(TORCH_DEVICE)
         # Scale points to the range of each dimension of the action space
-        lower_bounds = torch.tensor(self.env.action_space.low, dtype=torch.float, device=self.device)
-        upper_bounds = torch.tensor(self.env.action_space.high, dtype=torch.float, device=self.device)
+        lower_bounds = torch.tensor(self.env.action_space.low, dtype=torch.float, device=TORCH_DEVICE)
+        upper_bounds = torch.tensor(self.env.action_space.high, dtype=torch.float, device=TORCH_DEVICE)
         scaled_points = lower_bounds + (upper_bounds - lower_bounds) * raw_points
-        return scaled_points.to(self.device)
+        return scaled_points.to(TORCH_DEVICE)
 
     def prepare_feature_vector(self, s_df, a_df, preprocessing_module):
 
@@ -223,37 +245,39 @@ class ValueWalkCts(IRLMethod):
     def run_mcmc(self, s_df: torch.Tensor, a_df: torch.Tensor, theta_q_prior, preprocessing_module: Optional[torch.nn.Module] = None):
         print("Starting the MCMC phase")
 
-        pyro.clear_param_store()
-
         x_daf = self.prepare_feature_vector(s_df, a_df, preprocessing_module=preprocessing_module)
 
-        mcmc_kernel = get_pyro_mcmc_kernel(value_walk_model_approx_cts, self.config)
+        x_daf_jnp = _torch_to_jax(x_daf)
+        a_df_jnp = _torch_to_jax(a_df)
 
-        def checkpoint_hook(kernel, samples, stage, i):
-            if self.config.checkpoint_frequency is not None and i % self.config.checkpoint_frequency == 0:
-                torch.save({
-                    'info': {
-                        # 'config': self.config.json(),
-                        'stage': stage,
-                        'step': i},
-                    'samples': samples
-                }, self.config.checkpoint_path)
-                print(f"Checkpoint saved at iteration {i} into {self.config.checkpoint_path}")
-
-        if self.config.num_chains == 1 or not self.config.num_chains:
-            init_params = {VW_Q_PARAM_KEY: theta_q_prior.sample()}
+        if self.config.hmc_use_nuts:
+            mcmc_kernel = NUTS(value_walk_model_approx_cts_numpyro,
+                                        step_size=self.config.hmc_step_size,
+                                        adapt_step_size=self.config.hmc_adapt_step_size,
+                                        adapt_mass_matrix=self.config.hmc_adapt_mass_matrix,
+                                        target_accept_prob=self.config.hmc_target_accept_prob,)
+                                        #full_mass=self.config.hmc_full_mass)
         else:
-            init_params = {VW_Q_PARAM_KEY: torch.stack([theta_q_prior.sample() for _ in range(self.config.num_chains)])}
-        mcmc = pyro.infer.MCMC(mcmc_kernel,
-                               num_samples=self.config.num_samples,
-                               warmup_steps=self.config.warmup_steps,
-                               num_chains=self.config.num_chains,
-                               initial_params=init_params,
-                               disable_validation=False,
-                               hook_fn=checkpoint_hook if self.config.checkpoint_frequency is not None else None)
+            mcmc_kernel = HMC(value_walk_model_approx_cts_numpyro,
+                                        num_steps=self.config.hmc_num_steps,
+                                        step_size=self.config.hmc_step_size,
+                                        adapt_step_size=self.config.hmc_adapt_step_size,
+                                        adapt_mass_matrix=self.config.hmc_adapt_mass_matrix,
+                                        target_accept_prob=self.config.hmc_target_accept_prob,)
+                                        #full_mass=self.config.hmc_full_mass)
 
-        mcmc.run(x_daf=x_daf.detach().clone(memory_format=torch.contiguous_format),
-                 a_df=a_df,
+
+        mcmc = numpyro.infer.MCMC(mcmc_kernel,
+                               num_samples=self.config.num_samples,
+                               num_warmup=self.config.warmup_steps,
+                               num_chains=self.config.num_chains,
+                               chain_method = 'vectorized')
+        
+        rng_key = _rng_key()
+        
+        mcmc.run(rng_key = rng_key,
+                 x_daf=x_daf_jnp,
+                 a_df=a_df_jnp,
                  theta_q_prior=theta_q_prior,
                  beta_expert=self.config.beta_expert,
                  bayesian_module=self.config.q_model)
@@ -264,10 +288,10 @@ class ValueWalkCts(IRLMethod):
 
 
     def run(self, demonstrations_t: Demonstrations, preprocessing_module=None,
-            ) -> (MonteCarloLinearRewardModel, Optional[torch.nn.Module]):
+            ) -> Tuple[QBasedSampleBasedRewardModel, Optional[torch.nn.Module]]:
 
-        a_df = demonstrations_t.actions_tensor.float().to(self.device)
-        s_df = demonstrations_t.states_tensor.float().to(self.device)
+        a_df = demonstrations_t.actions_tensor.float().to(TORCH_DEVICE)
+        s_df = demonstrations_t.states_tensor.float().to(TORCH_DEVICE)
 
         if self.config.preprocessing_module_factory is not None and preprocessing_module is None:
             preprocessing_module = self.config.preprocessing_module_factory()
@@ -277,13 +301,12 @@ class ValueWalkCts(IRLMethod):
         else:
             aux_demos = demonstrations_t
 
-        theta_q_prior = QParamPriorCts(
+        theta_q_prior = QParamPriorCtsNumpyro(
             self.reward_prior,
             preprocessing_module=preprocessing_module,
             bayesian_module=self.config.q_model,
             env_sim=self.env,
             num_params=self.config.q_model_params,
-            device=self.device,
             use_cheating_sample=True,
             gamma=self.config.gamma,
             evaluation_trajectories=aux_demos,
@@ -295,6 +318,8 @@ class ValueWalkCts(IRLMethod):
                                 preprocessing_module=preprocessing_module)
 
         info = {}
+
+        samples[VW_Q_PARAM_KEY] = _jax_to_torch(samples[VW_Q_PARAM_KEY])
 
         return QBasedSampleBasedRewardModel(q_param_samples=samples,
                                             q_model=self.config.q_model,

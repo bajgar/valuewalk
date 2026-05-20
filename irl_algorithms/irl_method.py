@@ -69,3 +69,6 @@ class IRLMethod(ABC):
     @abstractmethod
     def run(self, trajectories_t: Demonstrations) -> RewardModel:
         raise NotImplementedError
+
+
+IRLConfig.model_rebuild()

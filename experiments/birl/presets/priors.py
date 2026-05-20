@@ -3,6 +3,7 @@ import pyro.distributions as dist
 
 from configuration.configurable_factory import configurable_factory
 from models.gp.gp_prior import GPPrior, PrecomputedGPPrior
+from models.gp.gp_prior_jax import GPPriorJax, PrecomputedGPPriorJax
 
 
 @configurable_factory
@@ -74,4 +75,36 @@ def get_static_evals_gp_prior(config: 'MCMCIRLConfig'):
 
         return gp_prior_instance
 
+    return prior_factory
+
+
+@configurable_factory
+def get_gp_prior_jax(config: 'MCMCIRLConfig'):
+
+    def prior_factory():
+        # Assuming the config object has attributes for GP prior configurations
+        # like prior_mean_factory and kernel_factory which return the respective mean function and kernel.
+
+        mean_function = config.prior_mean_factory()
+        kernel = config.prior_kernel_factory()
+
+        # Create an instance of the GPPrior
+        gp_prior_jax = GPPriorJax(mean_function=mean_function, kernel=kernel)
+
+        return gp_prior_jax
+
+    return prior_factory
+
+@configurable_factory
+def get_static_evals_gp_prior_jax(config: 'MCMCIRLConfig'):
+
+    def prior_factory():
+
+        mean_function = config.prior_mean_factory()
+        kernel = config.prior_kernel_factory()
+
+        gp_prior_jax = PrecomputedGPPriorJax(mean_function=mean_function, kernel=kernel)
+        
+        return gp_prior_jax
+    
     return prior_factory
